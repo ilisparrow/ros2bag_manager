@@ -4,15 +4,21 @@ A simple, web-based tool for managing ROS2 bag files. Built with FastAPI and HTM
 
 ## Features
 
-- Browse and load ROS2 bags from a folder
-- View bag metadata (date, size, topics, duration, message count)
-- Metadata stored in JSON format
-- Play bags with adjustable speed (0.5x to 10x)
-- Loop playback support
-- Record new bags with optional time limits
-- Record specific topics or all topics
-- Compress bags using 7z format
-- Simple, KISS interface
+- **Browse and auto-load** ROS2 bags from a folder with instant refresh
+- **Search and filter** bags by name or date
+- **Sort bags** by latest, oldest, biggest, or smallest
+- **Smart size display** (auto-formats to GB/MB/KB/B)
+- **Rename bags** directly from the list with inline editing
+- **User tracking** - set your username for recording attribution
+- **View bag metadata** - date, size, topics, duration, message count, format (MCAP/DB3)
+- **Play bags** with adjustable speed (0.5x to 10x) and loop mode
+- **Record new bags** with:
+  - Auto-generated names (ROS2 default convention) or custom names
+  - Duration limits
+  - Topic selection with visual chips interface
+  - Live topic discovery and refresh
+- **Compress bags** to 7z format
+- **Modern UI** with clean, responsive design
 
 ## Requirements
 
@@ -49,18 +55,37 @@ python app.py
 http://localhost:8000
 ```
 
-3. Click "Browse" to select your bags folder (or type the path manually)
+3. Enter your username in the header (optional, saved between sessions)
+
+4. Click "Browse" to select your bags folder
+   - Bags are automatically loaded when you select a folder
+   - Use the refresh button (⟳) to reload bags
    - Your folder selection is saved between sessions
 
-4. Click "Load Bags" to scan the folder for ROS2 bags
+5. Manage your bags:
+   - **Search**: Type in the search box to filter by name or date
+   - **Sort**: Choose from latest, oldest, biggest, or smallest
+   - **Rename**: Click the edit icon (✎) next to any bag name
+   - **Select**: Click any bag to view detailed information
 
-5. Select a bag from the list to view details
+6. View bag details:
+   - Compact table layout with all metadata
+   - Topics displayed in a clean grid
+   - Format type (MCAP or DB3)
+   - Size auto-formatted (GB/MB/KB)
 
-6. Use the controls to:
-   - Play bags with different speeds
-   - Enable loop playback
-   - Compress bags
-   - Record new bags
+7. Play bags:
+   - Select playback speed (0.5x to 10x)
+   - Enable loop mode for continuous playback
+   - One-click play button
+
+8. Record new bags (right panel):
+   - Leave name empty for auto-generated ROS2 naming
+   - Set optional duration limit
+   - Click "⟳ Refresh" to load available topics
+   - Click topics to select/deselect (chips turn green)
+   - Empty selection = record all topics
+   - Click the red "Record" button to start
 
 ## Features in Detail
 
@@ -103,6 +128,15 @@ rosbag_manager/
 └── README.md
 ```
 
+## Testing
+
+See [TESTING.md](TESTING.md) for detailed testing instructions and example commands.
+
+Quick test command after starting a recording:
+```bash
+ros2 topic pub /test_topic std_msgs/msg/String "data: 'Hello ROS2'" -r 10
+```
+
 ## Notes
 
 - Metadata is automatically saved to `bags_metadata.json`
@@ -111,4 +145,5 @@ rosbag_manager/
 - Bag playback and recording run in separate processes
 - Compressed files are saved with .7z extension in the same directory
 - The folder browser uses tkinter, which should be included with Python
+- Both MCAP and DB3 bag formats are supported
 

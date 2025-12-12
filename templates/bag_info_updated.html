@@ -1,0 +1,302 @@
+<div class="info-panel">
+    <h2>{{ bag.name }}</h2>
+
+    <table class="info-table">
+        <tr>
+            <td>Path</td>
+            <td style="font-family: monospace; font-size: 0.85rem;">{{ bag.path }}</td>
+        </tr>
+        <tr>
+            <td>Date</td>
+            <td>{{ bag.date[:19].replace('T', ' ') }}</td>
+        </tr>
+        <tr>
+            <td>Size</td>
+            <td><span id="bag-size-{{ bag_index }}"></span></td>
+        </tr>
+        {% if bag.format %}
+        <tr>
+            <td>Format</td>
+            <td>{{ bag.format | upper }}</td>
+        </tr>
+        {% endif %}
+        {% if bag.duration %}
+        <tr>
+            <td>Duration</td>
+            <td>{{ bag.duration }}</td>
+        </tr>
+        {% endif %}
+        {% if bag.messages %}
+        <tr>
+            <td>Messages</td>
+            <td>{{ "{:,}".format(bag.messages) }}</td>
+        </tr>
+        {% endif %}
+    </table>
+
+    <div class="tags-section" style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <div class="topics-header">Tags</div>
+            <button onclick="showAddTagDialog({{ bag_index }})" style="padding: 0.3rem 0.6rem; font-size: 0.85rem;">+ Add Tag</button>
+        </div>
+        <div id="tags-container-{{ bag_index }}" class="tags-display">
+            {% if bag.tags %}
+                {% for key, value in bag.tags.items() %}
+                <div class="tag-item">
+                    <span class="tag-key">{{ key }}:</span>
+                    <span class="tag-value">{{ value }}</span>
+                    <button class="tag-remove" onclick="removeTag({{ bag_index }}, '{{ key }}')">×</button>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div style="color: #95a5a6; font-size: 0.9rem;">No tags yet</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="topics-section">
+        <div class="topics-header">Topics ({{ bag.topics | length }})</div>
+        {% if bag.topics %}
+        <ul class="topic-list">
+            {% for topic in bag.topics %}
+            <li title="{{ topic }}">{{ topic }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div style="color: #95a5a6; padding: 1rem; text-align: center;">No topics found</div>
+        {% endif %}
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="rate-{{ bag_index }}">Speed:</label>
+            <select id="rate-{{ bag_index }}" name="rate">
+                <option value="0.5">0.5x</option>
+                <option value="1.0" selected>1.0x</option>
+                <option value="2.0">2.0x</option>
+                <option value="5.0">5.0x</option>
+                <option value="10.0">10.0x</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label for="loop-{{ bag_index }}">Loop:</label>
+            <input type="checkbox" id="loop-{{ bag_index }}" name="loop">
+        </div>
+
+        <button id="play-btn-{{ bag_index }}" onclick="playBag({{ bag_index }})">
+            <span id="play-btn-text-{{ bag_index }}">Play Bag</span>
+        </button>
+        <button id="stop-play-btn-{{ bag_index }}" style="display: none; background: #95a5a6;" onclick="stopPlay()">Stop Playback</button>
+        <button onclick="compressBag({{ bag_index }})" class="success">Compress</button>
+    </div>
+</div>
+
+<style>
+    .tags-display {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        min-height: 40px;
+    }
+
+    .tag-item {
+        background: #e3f2fd;
+        border: 1px solid #2196f3;
+        border-radius: 4px;
+        padding: 0.4rem 0.6rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .tag-key {
+        font-weight: 600;
+        color: #1976d2;
+    }
+
+    .tag-value {
+        color: #424242;
+    }
+
+    .tag-remove {
+        background: none;
+        border: none;
+        color: #f44336;
+        cursor: pointer;
+        padding: 0;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        line-height: 1;
+    }
+
+    .tag-remove:hover {
+        background: #ffebee;
+    }
+</style>
+
+<script>
+    // Format size
+    function formatSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    document.getElementById('bag-size-{{ bag_index }}').textContent = formatSize({{ bag.size }});
+
+    let playbackCheckInterval = null;
+
+    function checkPlaybackState() {
+        fetch('/playback-status')
+            .then(response => response.json())
+            .then(data => {
+                const playBtn = document.getElementById('play-btn-{{ bag_index }}');
+                const playBtnText = document.getElementById('play-btn-text-{{ bag_index }}');
+                const stopPlayBtn = document.getElementById('stop-play-btn-{{ bag_index }}');
+
+                if (data.playing) {
+                    playBtn.style.background = '#3498db';
+                    playBtn.disabled = true;
+                    playBtnText.textContent = 'Playing...';
+                    stopPlayBtn.style.display = 'inline-block';
+                } else {
+                    playBtn.style.background = '';
+                    playBtn.disabled = false;
+                    playBtnText.textContent = 'Play Bag';
+                    stopPlayBtn.style.display = 'none';
+
+                    if (playbackCheckInterval) {
+                        clearInterval(playbackCheckInterval);
+                        playbackCheckInterval = null;
+                    }
+                }
+            });
+    }
+
+    function playBag(bagIndex) {
+        const rate = document.getElementById('rate-' + bagIndex).value;
+        const loop = document.getElementById('loop-' + bagIndex).checked;
+
+        const formData = new FormData();
+        formData.append('bag_index', bagIndex);
+        formData.append('rate', rate);
+        formData.append('loop', loop ? 'true' : 'false');
+
+        fetch('/play-bag', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.detail || 'Failed to play bag');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            checkPlaybackState();
+            playbackCheckInterval = setInterval(checkPlaybackState, 2000);
+        })
+        .catch(error => {
+            console.error('Playback error:', error);
+            showAlert('Error', 'Error playing bag: ' + error.message, 'error');
+        });
+    }
+
+    function stopPlay() {
+        fetch('/stop-playback', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                checkPlaybackState();
+            })
+            .catch(error => showAlert('Error', 'Error stopping playback: ' + error, 'error'));
+    }
+
+    function compressBag(bagIndex) {
+        const formData = new FormData();
+        formData.append('bag_index', bagIndex);
+
+        fetch('/compress-bag', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            showAlert(
+                'Compression Complete',
+                `
+                <div><strong>Original:</strong> ${data.original}</div>
+                <div><strong>Compressed:</strong> ${data.compressed}</div>
+                `,
+                'success'
+            );
+        })
+        .catch(error => {
+            showAlert('Error', 'Error compressing bag: ' + error, 'error');
+        });
+    }
+
+    function showAddTagDialog(bagIndex) {
+        showPrompt('Add Tag', 'Enter tag in format "key:value" (e.g., "city:tokyo"):', '', (input) => {
+            if (!input || !input.includes(':')) {
+                showAlert('Invalid Format', 'Please use format "key:value" (e.g., "city:tokyo")', 'error');
+                return;
+            }
+
+            const parts = input.split(':');
+            const key = parts[0].trim();
+            const value = parts.slice(1).join(':').trim();
+
+            if (!key || !value) {
+                showAlert('Invalid Input', 'Both key and value are required', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('bag_index', bagIndex);
+            formData.append('key', key);
+            formData.append('value', value);
+
+            fetch('/add-bag-tag', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showAlert('Tag Added', `Added ${key}: ${value}`, 'success');
+                location.reload();
+            })
+            .catch(error => showAlert('Error', 'Error adding tag: ' + error, 'error'));
+        });
+    }
+
+    function removeTag(bagIndex, key) {
+        const formData = new FormData();
+        formData.append('bag_index', bagIndex);
+        formData.append('key', key);
+
+        fetch('/remove-bag-tag', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            showAlert('Tag Removed', `Removed tag: ${key}`, 'success');
+            location.reload();
+        })
+        .catch(error => showAlert('Error', 'Error removing tag: ' + error, 'error'));
+    }
+
+    // Check playback state on load
+    checkPlaybackState();
+</script>

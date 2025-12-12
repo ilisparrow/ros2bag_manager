@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROS2 Bag Manager</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .user-input {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-input label {
+            font-size: 0.9rem;
+        }
+
+        .user-input input {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid #34495e;
+            border-radius: 4px;
+            background: white;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: white;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .folder-selector {
+            padding: 1rem;
+            border-bottom: 1px solid #ddd;
+            background: #fafafa;
+        }
+
+        .folder-input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .folder-selector input[type="text"] {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .folder-selector button {
+            padding: 0.5rem 1rem;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .folder-selector button:hover {
+            background: #2980b9;
+        }
+
+        .folder-selector button.browse-btn {
+            background: #27ae60;
+        }
+
+        .folder-selector button.browse-btn:hover {
+            background: #229954;
+        }
+
+        .folder-selector button.refresh-btn {
+            background: #95a5a6;
+            padding: 0.5rem;
+        }
+
+        .folder-selector button.refresh-btn:hover {
+            background: #7f8c8d;
+        }
+
+        .bag-controls {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #ddd;
+            background: white;
+        }
+
+        .search-box {
+            margin-bottom: 0.5rem;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .sort-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .sort-controls select {
+            flex: 1;
+            padding: 0.4rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .bag-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+
+        .bag-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .bag-item:hover {
+            background: #f0f0f0;
+            border-color: #3498db;
+        }
+
+        .bag-item.selected {
+            background: #e3f2fd;
+            border-color: #3498db;
+        }
+
+        .bag-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .bag-name {
+            font-weight: 600;
+            color: #2c3e50;
+            flex: 1;
+        }
+
+        .bag-name.editing {
+            padding: 0.25rem;
+            border: 1px solid #3498db;
+            border-radius: 3px;
+            background: white;
+        }
+
+        .edit-btn {
+            background: none;
+            border: none;
+            color: #3498db;
+            cursor: pointer;
+            padding: 0.25rem;
+            font-size: 0.8rem;
+        }
+
+        .bag-date {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            margin-top: 0.25rem;
+        }
+
+        .bag-size {
+            font-size: 0.85rem;
+            color: #27ae60;
+            font-weight: 500;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .details-section {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .record-section {
+            width: 350px;
+            background: white;
+            border-left: 1px solid #ddd;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .record-section h2 {
+            margin-bottom: 1rem;
+            color: #2c3e50;
+            font-size: 1.2rem;
+        }
+
+        .info-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .info-panel h2 {
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-table tr {
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .info-table td {
+            padding: 0.75rem 0.5rem;
+        }
+
+        .info-table td:first-child {
+            font-weight: 600;
+            color: #555;
+            width: 120px;
+        }
+
+        .info-table td:last-child {
+            color: #333;
+        }
+
+        .topics-section {
+            margin-top: 1.5rem;
+        }
+
+        .topics-header {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.75rem;
+        }
+
+        .topic-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.5rem;
+            list-style: none;
+            padding: 0;
+        }
+
+        .topic-list li {
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #ecf0f1;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        button {
+            padding: 0.6rem 1.2rem;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button.danger {
+            background: #e74c3c;
+        }
+
+        button.danger:hover {
+            background: #c0392b;
+        }
+
+        button.success {
+            background: #27ae60;
+        }
+
+        button.success:hover {
+            background: #229954;
+        }
+
+        button.record-btn {
+            background: white;
+            color: #e74c3c;
+            border: 2px solid #e74c3c;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+            padding: 0.75rem;
+        }
+
+        button.record-btn:hover {
+            background: #fee;
+        }
+
+        button.record-btn.recording {
+            background: #e74c3c;
+            color: white;
+            cursor: default;
+        }
+
+        button.record-btn.recording:hover {
+            background: #e74c3c;
+        }
+
+        button.stop-btn {
+            background: #95a5a6;
+            color: white;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+
+        button.stop-btn:hover {
+            background: #7f8c8d;
+        }
+
+        .record-dot {
+            width: 12px;
+            height: 12px;
+            background: #e74c3c;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .record-btn.recording .record-dot {
+            background: white;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        input[type="number"], input[type="text"], select, textarea {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+        }
+
+        .topic-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            min-height: 80px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .chip {
+            background: white;
+            color: #2c3e50;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            border: 1.5px solid #bdc3c7;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            width: fit-content;
+            max-width: 100%;
+        }
+
+        .chip:hover {
+            border-color: #3498db;
+            background: #f8f9fa;
+        }
+
+        .chip.selected {
+            background: #27ae60;
+            color: white;
+            border-color: #27ae60;
+        }
+
+        .chip-remove {
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+        }
+
+        .refresh-topics {
+            background: #95a5a6;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+        }
+
+        .refresh-topics:hover {
+            background: #7f8c8d;
+        }
+
+        .placeholder {
+            text-align: center;
+            color: #95a5a6;
+            padding: 3rem;
+        }
+
+        .help-text {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            margin-top: 0.25rem;
+        }
+
+        /* Modal/Alert Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 90%;
+            animation: slideIn 0.2s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #ecf0f1;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .modal-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .modal-icon.success {
+            background: #d4edda;
+            color: #27ae60;
+        }
+
+        .modal-icon.error {
+            background: #f8d7da;
+            color: #e74c3c;
+        }
+
+        .modal-icon.info {
+            background: #d1ecf1;
+            color: #3498db;
+        }
+
+        .modal-title {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1.1rem;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .modal-body pre {
+            background: #f8f9fa;
+            padding: 0.75rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            margin: 0.5rem 0;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #ecf0f1;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        .modal-footer button {
+            padding: 0.5rem 1.25rem;
+            font-size: 0.95rem;
+        }
+
+        .prompt-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1.5px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            margin-top: 0.75rem;
+        }
+
+        .prompt-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>ROS2 Bag Manager</h1>
+        <div class="user-input">
+            <label for="username">User:</label>
+            <input type="text" id="username" placeholder="Your name" value="{{ current_user }}" onchange="saveUser(this.value)">
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="folder-selector">
+                <div class="folder-input-group">
+                    <input type="text" id="folder-input" placeholder="Select bags folder" value="{{ current_folder }}" readonly>
+                    <button class="browse-btn" onclick="browseFolder()">Browse</button>
+                    <button class="refresh-btn" onclick="loadBags()" title="Refresh">⟳</button>
+                </div>
+            </div>
+
+            <div class="bag-controls">
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Search bags..." oninput="filterBags()">
+                </div>
+                <div class="sort-controls">
+                    <select id="sort-select" onchange="sortBags()">
+                        <option value="latest">Latest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="biggest">Biggest First</option>
+                        <option value="smallest">Smallest First</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="bag-list" class="bag-list"></div>
+        </div>
+
+        <div class="main-content">
+            <div class="details-section">
+                <div id="bag-info-panel">
+                    <div class="placeholder">
+                        Select a bag from the list to view details
+                    </div>
+                </div>
+            </div>
+
+            <div class="record-section">
+                <h2>Record New Bag</h2>
+                <form id="record-form" onsubmit="recordBag(event)">
+                    <div class="form-group">
+                        <label for="bag_name">Bag Name (optional)</label>
+                        <input type="text" id="bag_name" name="bag_name" placeholder="Auto-generated if empty">
+                        <div class="help-text">Leave empty for ROS2 default naming</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="duration">Duration (seconds)</label>
+                        <input type="number" id="duration" name="duration" min="1" placeholder="Unlimited">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            Topics
+                            <button type="button" class="refresh-topics" onclick="loadTopics()">⟳ Refresh</button>
+                        </label>
+                        <div id="topic-chips" class="topic-chips">
+                            <div style="color: #95a5a6; font-size: 0.9rem;">Click refresh to load available topics</div>
+                        </div>
+                        <div class="help-text">Click topics to select/deselect. Empty = all topics</div>
+                    </div>
+                    <button type="submit" class="record-btn" id="record-btn">
+                        <span class="record-dot"></span>
+                        <span id="record-btn-text">Record</span>
+                    </button>
+                </form>
+                <button type="button" class="stop-btn" id="stop-btn" style="display: none;" onclick="stopRecording()">
+                    Stop Recording
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-icon" id="modal-icon"></div>
+                <div class="modal-title" id="modal-title"></div>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer" id="modal-footer"></div>
+        </div>
+    </div>
+
+    <script>
+        let allBags = {{ bags | tojson }};
+        let selectedTopics = [];
+        let recordingCheckInterval = null;
+
+        // Modal Functions
+        function showAlert(title, message, type = 'info') {
+            const overlay = document.getElementById('modal-overlay');
+            const icon = document.getElementById('modal-icon');
+            const titleEl = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
+            const footer = document.getElementById('modal-footer');
+
+            const icons = {
+                success: '✓',
+                error: '✕',
+                info: 'i'
+            };
+
+            icon.className = `modal-icon ${type}`;
+            icon.textContent = icons[type];
+            titleEl.textContent = title;
+            body.innerHTML = message;
+            footer.innerHTML = '<button onclick="closeModal()">OK</button>';
+
+            overlay.classList.add('show');
+        }
+
+        function showPrompt(title, message, defaultValue, callback) {
+            const overlay = document.getElementById('modal-overlay');
+            const icon = document.getElementById('modal-icon');
+            const titleEl = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
+            const footer = document.getElementById('modal-footer');
+
+            icon.className = 'modal-icon info';
+            icon.textContent = '?';
+            titleEl.textContent = title;
+            body.innerHTML = `
+                <div>${message}</div>
+                <input type="text" class="prompt-input" id="prompt-input" value="${defaultValue}" />
+            `;
+            footer.innerHTML = `
+                <button onclick="closeModal()" style="background: #95a5a6;">Cancel</button>
+                <button onclick="submitPrompt()">OK</button>
+            `;
+
+            overlay.classList.add('show');
+            setTimeout(() => document.getElementById('prompt-input').focus(), 100);
+
+            window.promptCallback = callback;
+        }
+
+        function submitPrompt() {
+            const value = document.getElementById('prompt-input').value;
+            if (window.promptCallback) {
+                window.promptCallback(value);
+            }
+            closeModal();
+        }
+
+        function showConfirm(title, message, callback) {
+            const overlay = document.getElementById('modal-overlay');
+            const icon = document.getElementById('modal-icon');
+            const titleEl = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
+            const footer = document.getElementById('modal-footer');
+
+            icon.className = 'modal-icon error';
+            icon.textContent = '!';
+            titleEl.textContent = title;
+            body.innerHTML = message;
+            footer.innerHTML = `
+                <button onclick="closeConfirm(false)" style="background: #95a5a6;">Cancel</button>
+                <button onclick="closeConfirm(true)" style="background: #e74c3c;">Delete</button>
+            `;
+
+            overlay.classList.add('show');
+            window.confirmCallback = callback;
+        }
+
+        function closeConfirm(confirmed) {
+            if (window.confirmCallback) {
+                window.confirmCallback(confirmed);
+            }
+            closeModal();
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== document.getElementById('modal-overlay')) return;
+            document.getElementById('modal-overlay').classList.remove('show');
+            window.promptCallback = null;
+            window.confirmCallback = null;
+        }
+
+        // Escape key to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+            if (e.key === 'Enter' && document.getElementById('modal-overlay').classList.contains('show')) {
+                if (document.getElementById('prompt-input')) {
+                    submitPrompt();
+                } else {
+                    closeModal();
+                }
+            }
+        });
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function renderBags(bags) {
+            const listEl = document.getElementById('bag-list');
+            if (!bags || bags.length === 0) {
+                listEl.innerHTML = '<div style="padding: 1rem; text-align: center; color: #95a5a6;">No bags found</div>';
+                return;
+            }
+
+            listEl.innerHTML = bags.map((bag, index) => `
+                <div class="bag-item" onclick="selectBag(${index})" data-index="${index}">
+                    <div class="bag-item-header">
+                        <div class="bag-name" id="bag-name-${index}">${bag.name}</div>
+                        <div style="display: flex; gap: 0.25rem;">
+                            <button class="edit-btn" onclick="event.stopPropagation(); editBagName(${index})" title="Rename">✎</button>
+                            <button class="edit-btn" onclick="event.stopPropagation(); deleteBagFromList(${index})" title="Delete" style="color: #e74c3c;">🗑</button>
+                        </div>
+                    </div>
+                    <div class="bag-date">${bag.date.substring(0, 19).replace('T', ' ')}</div>
+                    <div class="bag-size">${formatSize(bag.size)}</div>
+                </div>
+            `).join('');
+        }
+
+        function filterBags() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const filtered = allBags.filter(bag => {
+                const nameMatch = bag.name.toLowerCase().includes(search);
+                const dateMatch = bag.date.toLowerCase().includes(search);
+                const tagMatch = bag.tags && Object.entries(bag.tags).some(([key, value]) =>
+                    key.toLowerCase().includes(search) || value.toLowerCase().includes(search)
+                );
+                return nameMatch || dateMatch || tagMatch;
+            });
+            sortAndRender(filtered);
+        }
+
+        function sortBags() {
+            sortAndRender(allBags.filter(bag => {
+                const search = document.getElementById('search-input').value.toLowerCase();
+                const nameMatch = bag.name.toLowerCase().includes(search);
+                const dateMatch = bag.date.toLowerCase().includes(search);
+                const tagMatch = bag.tags && Object.entries(bag.tags).some(([key, value]) =>
+                    key.toLowerCase().includes(search) || value.toLowerCase().includes(search)
+                );
+                return nameMatch || dateMatch || tagMatch;
+            }));
+        }
+
+        function sortAndRender(bags) {
+            const sortBy = document.getElementById('sort-select').value;
+            const sorted = [...bags];
+
+            if (sortBy === 'latest') {
+                sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
+            } else if (sortBy === 'oldest') {
+                sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
+            } else if (sortBy === 'biggest') {
+                sorted.sort((a, b) => b.size - a.size);
+            } else if (sortBy === 'smallest') {
+                sorted.sort((a, b) => a.size - b.size);
+            }
+
+            renderBags(sorted);
+        }
+
+        function selectBag(index) {
+            document.querySelectorAll('.bag-item').forEach(el => el.classList.remove('selected'));
+            document.querySelector(`[data-index="${index}"]`)?.classList.add('selected');
+
+            fetch(`/bag-info/${index}`)
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById('bag-info-panel').innerHTML = html;
+                });
+        }
+
+        function editBagName(index) {
+            const nameEl = document.getElementById(`bag-name-${index}`);
+            const currentName = allBags[index].name;
+
+            showPrompt('Rename Bag', 'Enter new bag name:', currentName, (newName) => {
+                if (newName && newName !== currentName) {
+                    const formData = new FormData();
+                    formData.append('bag_index', index);
+                    formData.append('new_name', newName);
+
+                    fetch('/rename-bag', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        allBags[index].name = newName;
+                        nameEl.textContent = newName;
+                        showAlert('Success', 'Bag renamed successfully!', 'success');
+                    })
+                    .catch(error => showAlert('Error', 'Error renaming bag: ' + error, 'error'));
+                }
+            });
+        }
+
+        function deleteBagFromList(index) {
+            const bagName = allBags[index].name;
+            showConfirm(
+                'Delete Bag',
+                `<div style="color: #e74c3c; font-weight: 600; margin-bottom: 0.5rem;">⚠️ Warning: This action cannot be undone!</div><div>Are you sure you want to delete "${bagName}"?</div>`,
+                (confirmed) => {
+                    if (confirmed) {
+                        const formData = new FormData();
+                        formData.append('bag_index', index);
+
+                        fetch('/delete-bag', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            showAlert('Deleted', `Bag "${bagName}" has been permanently deleted.`, 'success');
+                            loadBags();
+                            document.getElementById('bag-info-panel').innerHTML = '<div class="no-selection">Select a bag to view details</div>';
+                        })
+                        .catch(error => showAlert('Error', 'Error deleting bag: ' + error, 'error'));
+                    }
+                }
+            );
+        }
+
+        function browseFolder() {
+            fetch('/browse-folder')
+                .then(response => {
+                    if (!response.ok) throw new Error('No folder selected');
+                    return response.json();
+                })
+                .then(data => {
+                    document.getElementById('folder-input').value = data.folder;
+                    loadBags();
+                })
+                .catch(error => console.log('Browse cancelled or error:', error));
+        }
+
+        function loadBags() {
+            const folder = document.getElementById('folder-input').value;
+            if (!folder) return;
+
+            const formData = new FormData();
+            formData.append('folder', folder);
+
+            fetch('/set-folder', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(() => {
+                fetch('/bags_metadata.json?' + new Date().getTime())
+                    .then(r => r.json())
+                    .then(metadata => {
+                        allBags = metadata.bags || [];
+                        sortAndRender(allBags);
+                    });
+            });
+        }
+
+        function loadTopics() {
+            fetch('/available-topics')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('topic-chips');
+                    if (data.topics.length === 0) {
+                        container.innerHTML = '<div style="color: #e74c3c; font-size: 0.9rem;">No topics found. Is ROS2 running?</div>';
+                        return;
+                    }
+
+                    container.innerHTML = data.topics.map(topic => `
+                        <div class="chip ${selectedTopics.includes(topic) ? 'selected' : ''}" onclick="toggleTopic('${topic}')">
+                            ${topic}
+                        </div>
+                    `).join('');
+                });
+        }
+
+        function toggleTopic(topic) {
+            const index = selectedTopics.indexOf(topic);
+            if (index > -1) {
+                selectedTopics.splice(index, 1);
+            } else {
+                selectedTopics.push(topic);
+            }
+            loadTopics();
+        }
+
+        function checkRecordingStatus() {
+            fetch('/recording-status')
+                .then(response => response.json())
+                .then(data => {
+                    const recordBtn = document.getElementById('record-btn');
+                    const recordBtnText = document.getElementById('record-btn-text');
+                    const stopBtn = document.getElementById('stop-btn');
+                    const form = document.getElementById('record-form');
+
+                    if (data.recording) {
+                        recordBtn.classList.add('recording');
+                        recordBtn.disabled = true;
+                        recordBtnText.textContent = 'Recording...';
+                        stopBtn.style.display = 'block';
+                        form.querySelectorAll('input, select').forEach(el => el.disabled = true);
+                    } else {
+                        recordBtn.classList.remove('recording');
+                        recordBtn.disabled = false;
+                        recordBtnText.textContent = 'Record';
+                        stopBtn.style.display = 'none';
+                        form.querySelectorAll('input, select').forEach(el => el.disabled = false);
+
+                        if (recordingCheckInterval) {
+                            clearInterval(recordingCheckInterval);
+                            recordingCheckInterval = null;
+                            loadBags();
+                        }
+                    }
+                });
+        }
+
+        function stopRecording() {
+            fetch('/stop-recording', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    showAlert('Recording Stopped', 'The recording has been stopped successfully.', 'success');
+                    checkRecordingStatus();
+                })
+                .catch(error => showAlert('Error', 'Error stopping recording: ' + error, 'error'));
+        }
+
+        function recordBag(event) {
+            event.preventDefault();
+
+            const formData = new FormData();
+            const bagName = document.getElementById('bag_name').value;
+            const duration = document.getElementById('duration').value;
+            const username = document.getElementById('username').value;
+
+            if (bagName) formData.append('bag_name', bagName);
+            if (duration) formData.append('duration', duration);
+            if (username) formData.append('user', username);
+            if (selectedTopics.length > 0) {
+                formData.append('topics', selectedTopics.join(','));
+            }
+
+            fetch('/record-bag', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                checkRecordingStatus();
+                recordingCheckInterval = setInterval(checkRecordingStatus, 2000);
+                document.getElementById('record-form').reset();
+                selectedTopics = [];
+                loadTopics();
+            })
+            .catch(error => showAlert('Error', 'Error starting recording: ' + error, 'error'));
+        }
+
+        function saveUser(username) {
+            const formData = new FormData();
+            formData.append('user', username);
+
+            fetch('/set-user', {
+                method: 'POST',
+                body: formData
+            }).catch(() => {});
+        }
+
+        // Bag detail functions (globally accessible for dynamically loaded content)
+        window.playBag = function(bagIndex) {
+            const rate = document.getElementById('rate-' + bagIndex).value;
+            const loop = document.getElementById('loop-' + bagIndex).checked;
+
+            const formData = new FormData();
+            formData.append('bag_index', bagIndex);
+            formData.append('rate', rate);
+            formData.append('loop', loop ? 'true' : 'false');
+
+            fetch('/play-bag', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.detail || 'Failed to play bag');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                showAlert('Playback Started', 'Bag is now playing', 'success');
+            })
+            .catch(error => {
+                console.error('Playback error:', error);
+                showAlert('Error', 'Error playing bag: ' + error.message, 'error');
+            });
+        };
+
+        window.compressBag = function(bagIndex) {
+            const formData = new FormData();
+            formData.append('bag_index', bagIndex);
+
+            fetch('/compress-bag', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showAlert(
+                    'Compression Complete',
+                    `
+                    <div><strong>Original:</strong> ${data.original}</div>
+                    <div><strong>Compressed:</strong> ${data.compressed}</div>
+                    `,
+                    'success'
+                );
+            })
+            .catch(error => {
+                showAlert('Error', 'Error compressing bag: ' + error, 'error');
+            });
+        };
+
+        window.showAddTagDialog = function(bagIndex) {
+            showPrompt('Add Tag', 'Enter tag in format "key:value" (e.g., "city:tokyo"):', '', (input) => {
+                if (!input || !input.includes(':')) {
+                    showAlert('Invalid Format', 'Please use format "key:value" (e.g., "city:tokyo")', 'error');
+                    return;
+                }
+
+                const parts = input.split(':');
+                const key = parts[0].trim();
+                const value = parts.slice(1).join(':').trim();
+
+                if (!key || !value) {
+                    showAlert('Invalid Input', 'Both key and value are required', 'error');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('bag_index', bagIndex);
+                formData.append('key', key);
+                formData.append('value', value);
+
+                fetch('/add-bag-tag', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    showAlert('Tag Added', `Added ${key}: ${value}`, 'success');
+                    // Reload bags and refresh the detail view
+                    loadBags();
+                    setTimeout(() => selectBag(bagIndex), 500);
+                })
+                .catch(error => showAlert('Error', 'Error adding tag: ' + error, 'error'));
+            });
+        };
+
+        window.removeTag = function(bagIndex, key) {
+            const formData = new FormData();
+            formData.append('bag_index', bagIndex);
+            formData.append('key', key);
+
+            fetch('/remove-bag-tag', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showAlert('Tag Removed', `Removed tag: ${key}`, 'success');
+                loadBags();
+            })
+            .catch(error => showAlert('Error', 'Error removing tag: ' + error, 'error'));
+        };
+
+        // Initial load
+        if (allBags.length > 0) {
+            renderBags(allBags);
+        }
+
+        // Check if recording is in progress on page load
+        checkRecordingStatus();
+    </script>
+</body>
+</html>

@@ -18,6 +18,9 @@ templates = Jinja2Templates(directory="templates")
 METADATA_FILE = "bags_metadata.json"
 CONFIG_FILE = "config.json"
 BAGS_FOLDER = None
+RECORDING_PROCESS = None
+PLAYBACK_PROCESS = None
+PLAYBACK_BAG_NAME = None
 
 
 def load_config():
@@ -102,10 +105,11 @@ async def index(request: Request):
     config = load_config()
     bags = metadata.get('bags', [])
     current_folder = config.get('last_folder', '')
+    current_user = config.get('last_user', '')
 
     return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "bags": bags, "current_folder": current_folder}
+        "index_new.html",
+        {"request": request, "bags": bags, "current_folder": current_folder, "current_user": current_user}
     )
 
 
@@ -217,9 +221,23 @@ async def get_bag_info_endpoint(request: Request, bag_index: int):
 
     bag = bags[bag_index]
     return templates.TemplateResponse(
-        "bag_info.html",
+        "bag_info_updated.html",
         {"request": request, "bag": bag, "bag_index": bag_index}
     )
+
+
+@app.get("/bags_metadata.json")
+async def get_metadata_json():
+    metadata = load_metadata()
+    return JSONResponse(metadata)
+
+
+@app.post("/set-user")
+async def set_user(user: str = Form(...)):
+    config = load_config()
+    config['last_user'] = user
+    save_config(config)
+    return JSONResponse({"status": "ok"})
 
 
 @app.post("/play-bag")
@@ -228,6 +246,11 @@ async def play_bag(
     rate: float = Form(1.0),
     loop: bool = Form(False)
 ):
+    global PLAYBACK_PROCESS, PLAYBACK_BAG_NAME
+
+    if PLAYBACK_PROCESS and PLAYBACK_PROCESS.poll() is None:
+        raise HTTPException(status_code=400, detail="Playback already in progress")
+
     metadata = load_metadata()
     bags = metadata.get('bags', [])
 
@@ -242,28 +265,158 @@ async def play_bag(
         cmd.append('--loop')
 
     try:
-        subprocess.Popen(cmd)
+        PLAYBACK_PROCESS = subprocess.Popen(cmd)
+        PLAYBACK_BAG_NAME = bag['name']
         return JSONResponse({"status": "Playing", "bag": bag['name'], "rate": rate, "loop": loop})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/stop-playback")
+async def stop_playback():
+    global PLAYBACK_PROCESS, PLAYBACK_BAG_NAME
+
+    if PLAYBACK_PROCESS is None or PLAYBACK_PROCESS.poll() is not None:
+        raise HTTPException(status_code=400, detail="No playback in progress")
+
+    try:
+        PLAYBACK_PROCESS.terminate()
+        PLAYBACK_PROCESS.wait(timeout=5)
+        bag_name = PLAYBACK_BAG_NAME
+        PLAYBACK_PROCESS = None
+        PLAYBACK_BAG_NAME = None
+        return JSONResponse({"status": "Playback stopped", "bag": bag_name})
+    except Exception as e:
+        PLAYBACK_PROCESS.kill()
+        PLAYBACK_PROCESS = None
+        PLAYBACK_BAG_NAME = None
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/playback-status")
+async def playback_status():
+    global PLAYBACK_PROCESS, PLAYBACK_BAG_NAME
+
+    if PLAYBACK_PROCESS is None:
+        return JSONResponse({"playing": False})
+
+    if PLAYBACK_PROCESS.poll() is None:
+        return JSONResponse({"playing": True, "bag": PLAYBACK_BAG_NAME})
+    else:
+        PLAYBACK_PROCESS = None
+        PLAYBACK_BAG_NAME = None
+        return JSONResponse({"playing": False})
+
+
+@app.post("/rename-bag")
+async def rename_bag(bag_index: int = Form(...), new_name: str = Form(...)):
+    metadata = load_metadata()
+    bags = metadata.get('bags', [])
+
+    if bag_index >= len(bags):
+        raise HTTPException(status_code=404, detail="Bag not found")
+
+    bag = bags[bag_index]
+    old_path = Path(bag['path'])
+    new_path = old_path.parent / new_name
+
+    try:
+        old_path.rename(new_path)
+        bags[bag_index]['name'] = new_name
+        bags[bag_index]['path'] = str(new_path)
+        metadata['bags'] = bags
+        save_metadata(metadata)
+        return JSONResponse({"status": "Renamed", "new_name": new_name})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/delete-bag")
+async def delete_bag(bag_index: int = Form(...)):
+    metadata = load_metadata()
+    bags = metadata.get('bags', [])
+
+    if bag_index >= len(bags):
+        raise HTTPException(status_code=404, detail="Bag not found")
+
+    bag = bags[bag_index]
+    bag_path = Path(bag['path'])
+
+    try:
+        import shutil
+        if bag_path.exists():
+            shutil.rmtree(bag_path)
+        bags.pop(bag_index)
+        metadata['bags'] = bags
+        save_metadata(metadata)
+        return JSONResponse({"status": "Deleted", "name": bag['name']})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/add-bag-tag")
+async def add_bag_tag(bag_index: int = Form(...), key: str = Form(...), value: str = Form(...)):
+    metadata = load_metadata()
+    bags = metadata.get('bags', [])
+
+    if bag_index >= len(bags):
+        raise HTTPException(status_code=404, detail="Bag not found")
+
+    if 'tags' not in bags[bag_index]:
+        bags[bag_index]['tags'] = {}
+
+    bags[bag_index]['tags'][key] = value
+    metadata['bags'] = bags
+    save_metadata(metadata)
+    return JSONResponse({"status": "Tag added", "key": key, "value": value})
+
+
+@app.post("/remove-bag-tag")
+async def remove_bag_tag(bag_index: int = Form(...), key: str = Form(...)):
+    metadata = load_metadata()
+    bags = metadata.get('bags', [])
+
+    if bag_index >= len(bags):
+        raise HTTPException(status_code=404, detail="Bag not found")
+
+    if 'tags' in bags[bag_index] and key in bags[bag_index]['tags']:
+        del bags[bag_index]['tags'][key]
+        metadata['bags'] = bags
+        save_metadata(metadata)
+        return JSONResponse({"status": "Tag removed", "key": key})
+    else:
+        raise HTTPException(status_code=404, detail="Tag not found")
+
+
 @app.post("/record-bag")
 async def record_bag(
-    bag_name: str = Form(...),
+    bag_name: Optional[str] = Form(None),
     duration: Optional[int] = Form(None),
-    topics: Optional[str] = Form(None)
+    topics: Optional[str] = Form(None),
+    user: Optional[str] = Form(None)
 ):
+    global RECORDING_PROCESS
+
+    if RECORDING_PROCESS and RECORDING_PROCESS.poll() is None:
+        raise HTTPException(status_code=400, detail="Recording already in progress")
+
     config = load_config()
     folder = config.get('last_folder', '.')
+
+    if not bag_name:
+        from datetime import datetime
+        bag_name = f"rosbag2_{datetime.now().strftime('%Y_%m_%d-%H_%M_%S')}"
 
     bag_path = Path(folder) / bag_name
 
     cmd = ['ros2', 'bag', 'record', '-o', str(bag_path)]
 
     if topics:
-        topic_list = [t.strip() for t in topics.split(',')]
-        cmd.extend(topic_list)
+        topic_list = [t.strip() for t in topics.split(',') if t.strip()]
+        if topic_list:
+            cmd.extend(topic_list)
+        else:
+            cmd.append('-a')
     else:
         cmd.append('-a')
 
@@ -271,15 +424,53 @@ async def record_bag(
         cmd.extend(['--duration', str(duration)])
 
     try:
-        subprocess.Popen(cmd)
+        RECORDING_PROCESS = subprocess.Popen(cmd)
+
+        if user:
+            config['last_user'] = user
+            save_config(config)
+
         return JSONResponse({
             "status": "Recording started",
             "bag_name": bag_name,
             "duration": duration,
-            "topics": topics or "all"
+            "topics": topics or "all",
+            "user": user
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/stop-recording")
+async def stop_recording():
+    global RECORDING_PROCESS
+
+    if RECORDING_PROCESS is None or RECORDING_PROCESS.poll() is not None:
+        raise HTTPException(status_code=400, detail="No recording in progress")
+
+    try:
+        RECORDING_PROCESS.terminate()
+        RECORDING_PROCESS.wait(timeout=5)
+        RECORDING_PROCESS = None
+        return JSONResponse({"status": "Recording stopped"})
+    except Exception as e:
+        RECORDING_PROCESS.kill()
+        RECORDING_PROCESS = None
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/recording-status")
+async def recording_status():
+    global RECORDING_PROCESS
+
+    if RECORDING_PROCESS is None:
+        return JSONResponse({"recording": False})
+
+    if RECORDING_PROCESS.poll() is None:
+        return JSONResponse({"recording": True})
+    else:
+        RECORDING_PROCESS = None
+        return JSONResponse({"recording": False})
 
 
 @app.post("/compress-bag")
