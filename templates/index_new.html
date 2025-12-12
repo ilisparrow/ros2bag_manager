@@ -618,6 +618,72 @@
             outline: none;
             border-color: #3498db;
         }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-height: 40vh;
+                border-right: none;
+                border-bottom: 1px solid #ddd;
+            }
+
+            .main-content {
+                flex-direction: column-reverse;
+            }
+
+            .record-section {
+                width: 100%;
+                border-left: none;
+                border-bottom: 1px solid #ddd;
+                order: -1;
+            }
+
+            .details-section {
+                width: 100%;
+            }
+
+            header {
+                padding: 0.75rem 1rem;
+                flex-direction: column;
+                gap: 0.75rem;
+                align-items: flex-start;
+            }
+
+            h1 {
+                font-size: 1.2rem;
+            }
+
+            .folder-input-group {
+                flex-direction: column;
+            }
+
+            .folder-selector button {
+                width: 100%;
+            }
+
+            .bag-item {
+                padding: 0.5rem;
+            }
+
+            .controls {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .controls button {
+                width: 100%;
+            }
+
+            .control-group {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1097,35 +1163,113 @@
         }
 
         // Bag detail functions (globally accessible for dynamically loaded content)
-        window.playBag = function(bagIndex) {
-            const rate = document.getElementById('rate-' + bagIndex).value;
-            const loop = document.getElementById('loop-' + bagIndex).checked;
+        let playbackCheckIntervals = {};
+        let outputCheckIntervals = {};
 
-            const formData = new FormData();
-            formData.append('bag_index', bagIndex);
-            formData.append('rate', rate);
-            formData.append('loop', loop ? 'true' : 'false');
+        window.togglePlayback = function(bagIndex) {
+            fetch('/playback-status')
+                .then(response => response.json())
+                .then(status => {
+                    if (status.playing) {
+                        // Stop playback
+                        fetch('/stop-playback', { method: 'POST' })
+                            .then(response => response.json())
+                            .then(data => {
+                                updatePlaybackUI(bagIndex, false);
+                            })
+                            .catch(error => showAlert('Error', 'Error stopping playback: ' + error, 'error'));
+                    } else {
+                        // Start playback
+                        const rate = document.getElementById('rate-' + bagIndex).value;
+                        const loop = document.getElementById('loop-' + bagIndex).checked;
 
-            fetch('/play-bag', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => {
-                        throw new Error(err.detail || 'Failed to play bag');
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                showAlert('Playback Started', 'Bag is now playing', 'success');
-            })
-            .catch(error => {
-                console.error('Playback error:', error);
-                showAlert('Error', 'Error playing bag: ' + error.message, 'error');
-            });
+                        const formData = new FormData();
+                        formData.append('bag_index', bagIndex);
+                        formData.append('rate', rate);
+                        formData.append('loop', loop ? 'true' : 'false');
+
+                        fetch('/play-bag', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(err => {
+                                    throw new Error(err.detail || 'Failed to play bag');
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            // Clear terminal and start monitoring
+                            const terminal = document.getElementById('terminal-output-' + bagIndex);
+                            if (terminal) {
+                                terminal.value = '';
+                            }
+                            updatePlaybackUI(bagIndex, true);
+                            startPlaybackMonitoring(bagIndex);
+                        })
+                        .catch(error => {
+                            console.error('Playback error:', error);
+                            showAlert('Error', 'Error playing bag: ' + error.message, 'error');
+                        });
+                    }
+                });
         };
+
+        function updatePlaybackUI(bagIndex, isPlaying) {
+            const playBtn = document.getElementById('play-btn-' + bagIndex);
+            const playBtnText = document.getElementById('play-btn-text-' + bagIndex);
+            const terminalSection = document.getElementById('terminal-section-' + bagIndex);
+
+            if (isPlaying) {
+                if (playBtn) playBtn.style.background = '#e74c3c';
+                if (playBtnText) playBtnText.textContent = 'Stop Playback';
+                if (terminalSection) terminalSection.style.display = 'block';
+            } else {
+                if (playBtn) playBtn.style.background = '';
+                if (playBtnText) playBtnText.textContent = 'Play Bag';
+
+                // Stop monitoring intervals
+                if (playbackCheckIntervals[bagIndex]) {
+                    clearInterval(playbackCheckIntervals[bagIndex]);
+                    delete playbackCheckIntervals[bagIndex];
+                }
+                if (outputCheckIntervals[bagIndex]) {
+                    clearInterval(outputCheckIntervals[bagIndex]);
+                    delete outputCheckIntervals[bagIndex];
+                }
+            }
+        }
+
+        function startPlaybackMonitoring(bagIndex) {
+            // Monitor playback status
+            playbackCheckIntervals[bagIndex] = setInterval(() => {
+                fetch('/playback-status')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.playing) {
+                            updatePlaybackUI(bagIndex, false);
+                        }
+                    });
+            }, 2000);
+
+            // Monitor output
+            outputCheckIntervals[bagIndex] = setInterval(() => {
+                fetch('/playback-output')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.output) {
+                            const terminal = document.getElementById('terminal-output-' + bagIndex);
+                            if (terminal) {
+                                terminal.value += data.output;
+                                terminal.scrollTop = terminal.scrollHeight;
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Error fetching output:', error));
+            }, 500);
+        }
 
         window.compressBag = function(bagIndex) {
             const formData = new FormData();
@@ -1200,6 +1344,7 @@
             .then(data => {
                 showAlert('Tag Removed', `Removed tag: ${key}`, 'success');
                 loadBags();
+                setTimeout(() => selectBag(bagIndex), 500);
             })
             .catch(error => showAlert('Error', 'Error removing tag: ' + error, 'error'));
         };

@@ -265,7 +265,13 @@ async def play_bag(
         cmd.append('--loop')
 
     try:
-        PLAYBACK_PROCESS = subprocess.Popen(cmd)
+        PLAYBACK_PROCESS = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
         PLAYBACK_BAG_NAME = bag['name']
         return JSONResponse({"status": "Playing", "bag": bag['name'], "rate": rate, "loop": loop})
     except Exception as e:
@@ -306,6 +312,23 @@ async def playback_status():
         PLAYBACK_PROCESS = None
         PLAYBACK_BAG_NAME = None
         return JSONResponse({"playing": False})
+
+
+@app.get("/playback-output")
+async def playback_output():
+    global PLAYBACK_PROCESS
+
+    if PLAYBACK_PROCESS is None or PLAYBACK_PROCESS.stdout is None:
+        return JSONResponse({"output": ""})
+
+    try:
+        import select
+        if select.select([PLAYBACK_PROCESS.stdout], [], [], 0)[0]:
+            line = PLAYBACK_PROCESS.stdout.readline()
+            return JSONResponse({"output": line})
+        return JSONResponse({"output": ""})
+    except:
+        return JSONResponse({"output": ""})
 
 
 @app.post("/rename-bag")
