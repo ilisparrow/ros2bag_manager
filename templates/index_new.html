@@ -619,43 +619,131 @@
             border-color: #3498db;
         }
 
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        .mobile-menu-btn:active {
+            transform: scale(0.95);
+        }
+
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        .mobile-overlay.show {
+            display: block;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
+            .mobile-menu-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
             .container {
                 flex-direction: column;
+                height: calc(100vh - 80px);
             }
 
             .sidebar {
-                width: 100%;
-                max-height: 40vh;
-                border-right: none;
-                border-bottom: 1px solid #ddd;
+                position: fixed;
+                top: 0;
+                left: -100%;
+                width: 85%;
+                max-width: 350px;
+                height: 100vh;
+                background: white;
+                z-index: 1000;
+                transition: left 0.3s ease;
+                border-right: 1px solid #ddd;
+                box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            }
+
+            .sidebar.show {
+                left: 0;
             }
 
             .main-content {
-                flex-direction: column-reverse;
+                flex-direction: column;
+                width: 100%;
+                height: 100%;
             }
 
             .record-section {
                 width: 100%;
+                height: 100%;
                 border-left: none;
-                border-bottom: 1px solid #ddd;
-                order: -1;
+                padding: 1rem;
+                overflow-y: auto;
             }
 
             .details-section {
-                width: 100%;
+                position: fixed;
+                top: 0;
+                right: -100%;
+                width: 90%;
+                max-width: 400px;
+                height: 100vh;
+                background: white;
+                z-index: 1000;
+                transition: right 0.3s ease;
+                padding: 1rem;
+                overflow-y: auto;
+                box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            }
+
+            .details-section.show {
+                right: 0;
             }
 
             header {
                 padding: 0.75rem 1rem;
-                flex-direction: column;
+                flex-direction: row;
                 gap: 0.75rem;
-                align-items: flex-start;
+                align-items: center;
+                justify-content: space-between;
             }
 
             h1 {
                 font-size: 1.2rem;
+            }
+
+            .user-input {
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+
+            .user-input label {
+                font-size: 0.75rem;
+            }
+
+            .user-input input {
+                padding: 0.3rem 0.5rem;
+                font-size: 0.85rem;
             }
 
             .folder-input-group {
@@ -683,6 +771,22 @@
                 width: 100%;
                 justify-content: space-between;
             }
+
+            .close-panel-btn {
+                display: block;
+                width: 100%;
+                padding: 0.75rem;
+                background: #95a5a6;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                margin-bottom: 1rem;
+                font-size: 1rem;
+            }
+        }
+
+        .close-panel-btn {
+            display: none;
         }
     </style>
 </head>
@@ -695,8 +799,12 @@
         </div>
     </header>
 
+    <div class="mobile-overlay" id="mobile-overlay" onclick="closeMobilePanels()"></div>
+    <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleBagList()">☰</button>
+
     <div class="container">
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
+            <button class="close-panel-btn" onclick="closeMobilePanels()">Close</button>
             <div class="folder-selector">
                 <div class="folder-input-group">
                     <input type="text" id="folder-input" placeholder="Select bags folder" value="{{ current_folder }}" readonly>
@@ -723,7 +831,8 @@
         </div>
 
         <div class="main-content">
-            <div class="details-section">
+            <div class="details-section" id="details-section">
+                <button class="close-panel-btn" onclick="closeMobilePanels()">Close</button>
                 <div id="bag-info-panel">
                     <div class="placeholder">
                         Select a bag from the list to view details
@@ -919,8 +1028,8 @@
             const filtered = allBags.filter(bag => {
                 const nameMatch = bag.name.toLowerCase().includes(search);
                 const dateMatch = bag.date.toLowerCase().includes(search);
-                const tagMatch = bag.tags && Object.entries(bag.tags).some(([key, value]) =>
-                    key.toLowerCase().includes(search) || value.toLowerCase().includes(search)
+                const tagMatch = bag.tags && bag.tags.some(tag =>
+                    tag.toLowerCase().includes(search)
                 );
                 return nameMatch || dateMatch || tagMatch;
             });
@@ -932,8 +1041,8 @@
                 const search = document.getElementById('search-input').value.toLowerCase();
                 const nameMatch = bag.name.toLowerCase().includes(search);
                 const dateMatch = bag.date.toLowerCase().includes(search);
-                const tagMatch = bag.tags && Object.entries(bag.tags).some(([key, value]) =>
-                    key.toLowerCase().includes(search) || value.toLowerCase().includes(search)
+                const tagMatch = bag.tags && bag.tags.some(tag =>
+                    tag.toLowerCase().includes(search)
                 );
                 return nameMatch || dateMatch || tagMatch;
             }));
@@ -964,7 +1073,28 @@
                 .then(response => response.text())
                 .then(html => {
                     document.getElementById('bag-info-panel').innerHTML = html;
+
+                    // On mobile, close bag list and open details
+                    if (window.innerWidth <= 768) {
+                        closeMobilePanels();
+                        document.getElementById('details-section').classList.add('show');
+                        document.getElementById('mobile-overlay').classList.add('show');
+                    }
                 });
+        }
+
+        function toggleBagList() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+
+            sidebar.classList.toggle('show');
+            overlay.classList.toggle('show');
+        }
+
+        function closeMobilePanels() {
+            document.getElementById('sidebar').classList.remove('show');
+            document.getElementById('details-section').classList.remove('show');
+            document.getElementById('mobile-overlay').classList.remove('show');
         }
 
         function editBagName(index) {
@@ -1295,46 +1425,36 @@
             });
         };
 
-        window.showAddTagDialog = function(bagIndex) {
-            showPrompt('Add Tag', 'Enter tag in format "key:value" (e.g., "city:tokyo"):', '', (input) => {
-                if (!input || !input.includes(':')) {
-                    showAlert('Invalid Format', 'Please use format "key:value" (e.g., "city:tokyo")', 'error');
-                    return;
-                }
+        window.addTag = function(bagIndex, tag) {
+            tag = tag.trim();
+            if (!tag) return;
 
-                const parts = input.split(':');
-                const key = parts[0].trim();
-                const value = parts.slice(1).join(':').trim();
-
-                if (!key || !value) {
-                    showAlert('Invalid Input', 'Both key and value are required', 'error');
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('bag_index', bagIndex);
-                formData.append('key', key);
-                formData.append('value', value);
-
-                fetch('/add-bag-tag', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    showAlert('Tag Added', `Added ${key}: ${value}`, 'success');
-                    // Reload bags and refresh the detail view
-                    loadBags();
-                    setTimeout(() => selectBag(bagIndex), 500);
-                })
-                .catch(error => showAlert('Error', 'Error adding tag: ' + error, 'error'));
-            });
-        };
-
-        window.removeTag = function(bagIndex, key) {
             const formData = new FormData();
             formData.append('bag_index', bagIndex);
-            formData.append('key', key);
+            formData.append('tag', tag);
+
+            fetch('/add-bag-tag', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Reload metadata directly without regenerating
+                fetch('/bags_metadata.json?' + new Date().getTime())
+                    .then(r => r.json())
+                    .then(metadata => {
+                        allBags = metadata.bags || [];
+                        sortAndRender(allBags);
+                        setTimeout(() => selectBag(bagIndex), 100);
+                    });
+            })
+            .catch(error => console.error('Error adding tag:', error));
+        };
+
+        window.removeTag = function(bagIndex, tag) {
+            const formData = new FormData();
+            formData.append('bag_index', bagIndex);
+            formData.append('tag', tag);
 
             fetch('/remove-bag-tag', {
                 method: 'POST',
@@ -1342,11 +1462,16 @@
             })
             .then(response => response.json())
             .then(data => {
-                showAlert('Tag Removed', `Removed tag: ${key}`, 'success');
-                loadBags();
-                setTimeout(() => selectBag(bagIndex), 500);
+                // Reload metadata directly without regenerating
+                fetch('/bags_metadata.json?' + new Date().getTime())
+                    .then(r => r.json())
+                    .then(metadata => {
+                        allBags = metadata.bags || [];
+                        sortAndRender(allBags);
+                        setTimeout(() => selectBag(bagIndex), 100);
+                    });
             })
-            .catch(error => showAlert('Error', 'Error removing tag: ' + error, 'error'));
+            .catch(error => console.error('Error removing tag:', error));
         };
 
         // Initial load

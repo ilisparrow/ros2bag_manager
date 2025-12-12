@@ -35,21 +35,26 @@
     </table>
 
     <div class="tags-section" style="margin-top: 1.5rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-            <div class="topics-header">Tags</div>
-            <button onclick="showAddTagDialog({{ bag_index }})" style="padding: 0.3rem 0.6rem; font-size: 0.85rem;">+ Add Tag</button>
+        <div class="topics-header">Tags</div>
+        <div style="margin-top: 0.5rem;">
+            <input
+                type="text"
+                id="tag-input-{{ bag_index }}"
+                placeholder="Type a tag and press Enter..."
+                style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem;"
+                onkeypress="if(event.key === 'Enter') { addTag({{ bag_index }}, this.value); this.value = ''; }"
+            >
         </div>
-        <div id="tags-container-{{ bag_index }}" class="tags-display">
+        <div id="tags-container-{{ bag_index }}" class="tags-display" style="margin-top: 0.75rem;">
             {% if bag.tags %}
-                {% for key, value in bag.tags.items() %}
-                <div class="tag-item">
-                    <span class="tag-key">{{ key }}:</span>
-                    <span class="tag-value">{{ value }}</span>
-                    <button class="tag-remove" onclick="removeTag({{ bag_index }}, '{{ key }}')">×</button>
+                {% for tag in bag.tags %}
+                <div class="tag-chip">
+                    <span>{{ tag }}</span>
+                    <button class="chip-remove" onclick="removeTag({{ bag_index }}, '{{ tag }}')">×</button>
                 </div>
                 {% endfor %}
             {% else %}
-            <div style="color: #95a5a6; font-size: 0.9rem;">No tags yet</div>
+            <div style="color: #95a5a6; font-size: 0.9rem;">No tags yet. Type above and press Enter.</div>
             {% endif %}
         </div>
     </div>
@@ -104,7 +109,7 @@
         min-height: 40px;
     }
 
-    .tag-item {
+    .tag-chip {
         background: #e3f2fd;
         border: 1px solid #2196f3;
         border-radius: 4px;
@@ -113,34 +118,26 @@
         align-items: center;
         gap: 0.5rem;
         font-size: 0.85rem;
-    }
-
-    .tag-key {
-        font-weight: 600;
         color: #1976d2;
     }
 
-    .tag-value {
-        color: #424242;
-    }
-
-    .tag-remove {
+    .chip-remove {
         background: none;
         border: none;
         color: #f44336;
         cursor: pointer;
         padding: 0;
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         line-height: 1;
     }
 
-    .tag-remove:hover {
+    .chip-remove:hover {
         background: #ffebee;
     }
 </style>
@@ -173,81 +170,6 @@
             }
         });
 
-    function compressBag(bagIndex) {
-        const formData = new FormData();
-        formData.append('bag_index', bagIndex);
-
-        fetch('/compress-bag', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            showAlert(
-                'Compression Complete',
-                `
-                <div><strong>Original:</strong> ${data.original}</div>
-                <div><strong>Compressed:</strong> ${data.compressed}</div>
-                `,
-                'success'
-            );
-        })
-        .catch(error => {
-            showAlert('Error', 'Error compressing bag: ' + error, 'error');
-        });
-    }
-
-    function showAddTagDialog(bagIndex) {
-        showPrompt('Add Tag', 'Enter tag in format "key:value" (e.g., "city:tokyo"):', '', (input) => {
-            if (!input || !input.includes(':')) {
-                showAlert('Invalid Format', 'Please use format "key:value" (e.g., "city:tokyo")', 'error');
-                return;
-            }
-
-            const parts = input.split(':');
-            const key = parts[0].trim();
-            const value = parts.slice(1).join(':').trim();
-
-            if (!key || !value) {
-                showAlert('Invalid Input', 'Both key and value are required', 'error');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('bag_index', bagIndex);
-            formData.append('key', key);
-            formData.append('value', value);
-
-            fetch('/add-bag-tag', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                showAlert('Tag Added', `Added ${key}: ${value}`, 'success');
-                location.reload();
-            })
-            .catch(error => showAlert('Error', 'Error adding tag: ' + error, 'error'));
-        });
-    }
-
-    function removeTag(bagIndex, key) {
-        const formData = new FormData();
-        formData.append('bag_index', bagIndex);
-        formData.append('key', key);
-
-        fetch('/remove-bag-tag', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            showAlert('Tag Removed', `Removed tag: ${key}`, 'success');
-            location.reload();
-        })
-        .catch(error => showAlert('Error', 'Error removing tag: ' + error, 'error'));
-    }
-
-    // Check playback state on load
-    checkPlaybackState();
+    // All interactive functions (compressBag, showAddTagDialog, removeTag, togglePlayback)
+    // are now defined globally in index_new.html
 </script>

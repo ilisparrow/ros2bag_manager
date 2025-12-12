@@ -378,7 +378,7 @@ async def delete_bag(bag_index: int = Form(...)):
 
 
 @app.post("/add-bag-tag")
-async def add_bag_tag(bag_index: int = Form(...), key: str = Form(...), value: str = Form(...)):
+async def add_bag_tag(bag_index: int = Form(...), tag: str = Form(...)):
     metadata = load_metadata()
     bags = metadata.get('bags', [])
 
@@ -386,27 +386,30 @@ async def add_bag_tag(bag_index: int = Form(...), key: str = Form(...), value: s
         raise HTTPException(status_code=404, detail="Bag not found")
 
     if 'tags' not in bags[bag_index]:
-        bags[bag_index]['tags'] = {}
+        bags[bag_index]['tags'] = []
 
-    bags[bag_index]['tags'][key] = value
+    # Don't add duplicate tags
+    if tag not in bags[bag_index]['tags']:
+        bags[bag_index]['tags'].append(tag)
+
     metadata['bags'] = bags
     save_metadata(metadata)
-    return JSONResponse({"status": "Tag added", "key": key, "value": value})
+    return JSONResponse({"status": "Tag added", "tag": tag})
 
 
 @app.post("/remove-bag-tag")
-async def remove_bag_tag(bag_index: int = Form(...), key: str = Form(...)):
+async def remove_bag_tag(bag_index: int = Form(...), tag: str = Form(...)):
     metadata = load_metadata()
     bags = metadata.get('bags', [])
 
     if bag_index >= len(bags):
         raise HTTPException(status_code=404, detail="Bag not found")
 
-    if 'tags' in bags[bag_index] and key in bags[bag_index]['tags']:
-        del bags[bag_index]['tags'][key]
+    if 'tags' in bags[bag_index] and tag in bags[bag_index]['tags']:
+        bags[bag_index]['tags'].remove(tag)
         metadata['bags'] = bags
         save_metadata(metadata)
-        return JSONResponse({"status": "Tag removed", "key": key})
+        return JSONResponse({"status": "Tag removed", "tag": tag})
     else:
         raise HTTPException(status_code=404, detail="Tag not found")
 
