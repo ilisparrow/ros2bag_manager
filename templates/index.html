@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROS2 Bag Manager</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: white;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .folder-selector {
+            padding: 1rem;
+            border-bottom: 1px solid #ddd;
+            background: #fafafa;
+        }
+
+        .folder-input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .folder-selector input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .folder-selector button {
+            padding: 0.5rem 1rem;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .folder-selector button:hover {
+            background: #2980b9;
+        }
+
+        .folder-selector button.browse-btn {
+            background: #27ae60;
+        }
+
+        .folder-selector button.browse-btn:hover {
+            background: #229954;
+        }
+
+        .folder-selector button[type="submit"] {
+            width: 100%;
+        }
+
+        .bag-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+
+        .bag-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .bag-item:hover {
+            background: #f0f0f0;
+            border-color: #3498db;
+        }
+
+        .bag-item.selected {
+            background: #e3f2fd;
+            border-color: #3498db;
+        }
+
+        .bag-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.25rem;
+        }
+
+        .bag-date {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+        }
+
+        .bag-size {
+            font-size: 0.85rem;
+            color: #95a5a6;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .info-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .info-panel h2 {
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+
+        .info-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-value {
+            color: #333;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 1.5rem;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button.danger {
+            background: #e74c3c;
+        }
+
+        button.danger:hover {
+            background: #c0392b;
+        }
+
+        button.success {
+            background: #27ae60;
+        }
+
+        button.success:hover {
+            background: #229954;
+        }
+
+        input[type="number"], input[type="text"], select {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .topic-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .topic-list li {
+            padding: 0.5rem;
+            background: #f8f9fa;
+            margin-bottom: 0.25rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .record-section {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .placeholder {
+            text-align: center;
+            color: #95a5a6;
+            padding: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>ROS2 Bag Manager</h1>
+    </header>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="folder-selector">
+                <form id="folder-form" hx-post="/set-folder" hx-target="#bag-list" hx-swap="innerHTML">
+                    <div class="folder-input-group">
+                        <input type="text" id="folder-input" name="folder" placeholder="Select bags folder" value="{{ current_folder }}" required readonly>
+                        <button type="button" class="browse-btn" onclick="browseFolder()">Browse</button>
+                    </div>
+                    <button type="submit">Load Bags</button>
+                </form>
+            </div>
+            <div id="bag-list" class="bag-list">
+                {% include 'bag_list.html' %}
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="record-section">
+                <h2>Record New Bag</h2>
+                <form hx-post="/record-bag" hx-swap="none">
+                    <div class="form-group">
+                        <label for="bag_name">Bag Name:</label>
+                        <input type="text" id="bag_name" name="bag_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="duration">Duration (seconds, optional):</label>
+                        <input type="number" id="duration" name="duration" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="topics">Topics (comma-separated, leave empty for all):</label>
+                        <input type="text" id="topics" name="topics" placeholder="/topic1, /topic2">
+                    </div>
+                    <button type="submit" class="success">Start Recording</button>
+                </form>
+            </div>
+
+            <div id="bag-info-panel">
+                <div class="placeholder">
+                    Select a bag from the list to view details
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function browseFolder() {
+            fetch('/browse-folder')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('No folder selected');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    document.getElementById('folder-input').value = data.folder;
+                })
+                .catch(error => {
+                    console.log('Browse cancelled or error:', error);
+                });
+        }
+    </script>
+</body>
+</html>

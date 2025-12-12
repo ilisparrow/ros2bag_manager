@@ -1,0 +1,13 @@
+[project]
+name = "rosbag-manager"
+version = "0.1.0"
+description = "Web-based ROS2 bag management tool"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "jinja2>=3.1.2",
+    "python-multipart>=0.0.6",
+    "aiofiles>=23.2.1",
+]

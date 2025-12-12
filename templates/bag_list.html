@@ -1,0 +1,17 @@
+{% if bags %}
+    {% for bag in bags %}
+    <div class="bag-item"
+         hx-get="/bag-info/{{ loop.index0 }}"
+         hx-target="#bag-info-panel"
+         hx-swap="innerHTML"
+         onclick="document.querySelectorAll('.bag-item').forEach(el => el.classList.remove('selected')); this.classList.add('selected');">
+        <div class="bag-name">{{ bag.name }}</div>
+        <div class="bag-date">{{ bag.date[:19].replace('T', ' ') }}</div>
+        <div class="bag-size">{{ (bag.size / 1024 / 1024) | round(2) }} MB</div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div style="padding: 1rem; text-align: center; color: #95a5a6;">
+        No bags found in this folder
+    </div>
+{% endif %}

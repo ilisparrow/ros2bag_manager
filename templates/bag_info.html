@@ -1,0 +1,114 @@
+<div class="info-panel">
+    <h2>{{ bag.name }}</h2>
+
+    <div class="info-section">
+        <div class="info-label">Path</div>
+        <div class="info-value">{{ bag.path }}</div>
+    </div>
+
+    <div class="info-section">
+        <div class="info-label">Date</div>
+        <div class="info-value">{{ bag.date[:19].replace('T', ' ') }}</div>
+    </div>
+
+    <div class="info-section">
+        <div class="info-label">Size</div>
+        <div class="info-value">{{ (bag.size / 1024 / 1024) | round(2) }} MB</div>
+    </div>
+
+    {% if bag.format %}
+    <div class="info-section">
+        <div class="info-label">Format</div>
+        <div class="info-value">{{ bag.format | upper }}</div>
+    </div>
+    {% endif %}
+
+    {% if bag.duration %}
+    <div class="info-section">
+        <div class="info-label">Duration</div>
+        <div class="info-value">{{ bag.duration }}</div>
+    </div>
+    {% endif %}
+
+    {% if bag.messages %}
+    <div class="info-section">
+        <div class="info-label">Messages</div>
+        <div class="info-value">{{ bag.messages }}</div>
+    </div>
+    {% endif %}
+
+    <div class="info-section">
+        <div class="info-label">Topics ({{ bag.topics | length }})</div>
+        {% if bag.topics %}
+        <ul class="topic-list">
+            {% for topic in bag.topics %}
+            <li>{{ topic }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="info-value">No topics found</div>
+        {% endif %}
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="rate-{{ bag_index }}">Speed:</label>
+            <select id="rate-{{ bag_index }}" name="rate">
+                <option value="0.5">0.5x</option>
+                <option value="1.0" selected>1.0x</option>
+                <option value="2.0">2.0x</option>
+                <option value="5.0">5.0x</option>
+                <option value="10.0">10.0x</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label for="loop-{{ bag_index }}">Loop:</label>
+            <input type="checkbox" id="loop-{{ bag_index }}" name="loop">
+        </div>
+
+        <button onclick="playBag({{ bag_index }})">Play Bag</button>
+        <button onclick="compressBag({{ bag_index }})" class="success">Compress Bag</button>
+    </div>
+</div>
+
+<script>
+    function playBag(bagIndex) {
+        const rate = document.getElementById('rate-' + bagIndex).value;
+        const loop = document.getElementById('loop-' + bagIndex).checked;
+
+        const formData = new FormData();
+        formData.append('bag_index', bagIndex);
+        formData.append('rate', rate);
+        formData.append('loop', loop);
+
+        fetch('/play-bag', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert('Playing bag: ' + data.bag + '\nRate: ' + data.rate + 'x\nLoop: ' + data.loop);
+        })
+        .catch(error => {
+            alert('Error playing bag: ' + error);
+        });
+    }
+
+    function compressBag(bagIndex) {
+        const formData = new FormData();
+        formData.append('bag_index', bagIndex);
+
+        fetch('/compress-bag', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert('Bag compressed successfully!\nCompressed file: ' + data.compressed);
+        })
+        .catch(error => {
+            alert('Error compressing bag: ' + error);
+        });
+    }
+</script>
