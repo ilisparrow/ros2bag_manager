@@ -174,6 +174,13 @@ Quick test command after starting a recording:
 ros2 topic pub /test_topic std_msgs/msg/String "data: 'Hello ROS2'" -r 10
 ```
 
+## TODO
+
+- [ ] Add merge topic option with topic choices
+- [ ] Enable compression and preview by default
+- [ ] Make it run in background (Docker or executable)
+- [ ] Deliverable as Docker container or standalone executable
+
 ## Notes
 
 - Metadata (including tags) is automatically saved to `bags_metadata.json`
