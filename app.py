@@ -172,6 +172,12 @@ async def set_folder(folder: str = Form(...)):
     metadata = load_metadata()
     metadata['folder'] = folder
 
+    # Create a map of existing bags by path to preserve metadata
+    existing_bags_map = {}
+    if 'bags' in metadata:
+        for bag in metadata['bags']:
+            existing_bags_map[bag['path']] = bag
+
     bags = []
     folder_path = Path(folder)
 
@@ -186,16 +192,35 @@ async def set_folder(folder: str = Form(...)):
                     file_type = 'db3' if db3_files else 'mcap'
                     print(f"Found bag: {item.name} with {len(bag_files)} {file_type} files")
                     bag_info = get_bag_info(str(item))
-                    bag_data = {
-                        'name': item.name,
-                        'path': str(item),
-                        'date': datetime.fromtimestamp(item.stat().st_mtime).isoformat(),
-                        'size': bag_info['size'],
-                        'topics': bag_info['topics'],
-                        'duration': bag_info['duration'],
-                        'messages': bag_info['messages'],
-                        'format': file_type
-                    }
+                    bag_path = str(item)
+
+                    # Check if we have existing metadata for this bag
+                    if bag_path in existing_bags_map:
+                        # Update the existing bag data with fresh info
+                        bag_data = existing_bags_map[bag_path]
+                        bag_data.update({
+                            'name': item.name,
+                            'date': datetime.fromtimestamp(item.stat().st_mtime).isoformat(),
+                            'size': bag_info['size'],
+                            'topics': bag_info['topics'],
+                            'duration': bag_info['duration'],
+                            'messages': bag_info['messages'],
+                            'format': file_type
+                        })
+                        # Preserve 'tags' and 'qos_settings' if they exist
+                    else:
+                        # Create new bag data
+                        bag_data = {
+                            'name': item.name,
+                            'path': bag_path,
+                            'date': datetime.fromtimestamp(item.stat().st_mtime).isoformat(),
+                            'size': bag_info['size'],
+                            'topics': bag_info['topics'],
+                            'duration': bag_info['duration'],
+                            'messages': bag_info['messages'],
+                            'format': file_type
+                        }
+
                     bags.append(bag_data)
                 else:
                     print(f"Skipping {item.name} - no bag files found")
@@ -529,6 +554,44 @@ async def compress_bag(bag_index: int = Form(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/save-qos")
+async def save_qos(
+    bag_index: int = Form(...),
+    topic: str = Form(...),
+    reliability: str = Form(...),
+    durability: str = Form(...),
+    history: str = Form(...),
+    depth: int = Form(...)
+):
+    metadata = load_metadata()
+    bags = metadata.get("bags", [])
+
+    if bag_index >= len(bags):
+        raise HTTPException(status_code=404, detail="Bag not found")
+
+    # Initialize qos_settings if not exists
+    if 'qos_settings' not in bags[bag_index]:
+        bags[bag_index]['qos_settings'] = {}
+
+    # Save QoS settings for the topic
+    bags[bag_index]['qos_settings'][topic] = {
+        'reliability': reliability,
+        'durability': durability,
+        'history': history,
+        'depth': depth
+    }
+
+    metadata['bags'] = bags
+    save_metadata(metadata)
+
+    return JSONResponse({
+        "status": "QoS settings saved",
+        "topic": topic,
+        "settings": bags[bag_index]['qos_settings'][topic]
+    })
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

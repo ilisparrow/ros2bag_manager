@@ -62,38 +62,53 @@
     <div class="topics-section">
         <div class="topics-header">Topics ({{ bag.topics | length }})</div>
         {% if bag.topics %}
-        <ul class="topic-list">
+        <div class="topic-grid">
             {% for topic in bag.topics %}
-            <li title="{{ topic }}">{{ topic }}</li>
+            <div class="topic-item">
+                <span class="topic-name" title="{{ topic }}">{{ topic }}</span>
+                <button class="qos-btn" onclick="showQoSSettings({{ bag_index }}, '{{ topic }}')" title="QoS Settings">⚙️</button>
+            </div>
             {% endfor %}
-        </ul>
+        </div>
         {% else %}
         <div style="color: #95a5a6; padding: 1rem; text-align: center;">No topics found</div>
         {% endif %}
     </div>
 
-    <div class="controls">
-        <div class="control-group">
-            <label for="rate-{{ bag_index }}">Speed:</label>
-            <select id="rate-{{ bag_index }}" name="rate">
-                <option value="0.5">0.5x</option>
-                <option value="1.0" selected>1.0x</option>
-                <option value="2.0">2.0x</option>
-                <option value="5.0">5.0x</option>
-                <option value="10.0">10.0x</option>
-            </select>
+    <!-- Music Player Controls -->
+    <div class="player-wrapper">
+        <div class="player-header">
+            <div class="playback-time">
+                <span id="current-time-{{ bag_index }}">00:00</span>
+                <span style="color: #95a5a6;"> / </span>
+                <span id="total-time-{{ bag_index }}">{{ bag.duration.replace('s', '').split('.')[0] if bag.duration else '00:00' }}</span>
+            </div>
+            <button onclick="compressBag({{ bag_index }})" class="compress-btn" title="Compress bag">📦</button>
         </div>
 
-        <div class="control-group">
-            <label for="loop-{{ bag_index }}">Loop:</label>
-            <input type="checkbox" id="loop-{{ bag_index }}" name="loop">
-        </div>
+        <div class="player-main">
+            <div class="speed-control">
+                <label for="rate-{{ bag_index }}">Speed</label>
+                <select id="rate-{{ bag_index }}" name="rate" class="speed-select">
+                    <option value="0.5">0.5x</option>
+                    <option value="1.0" selected>1.0x</option>
+                    <option value="2.0">2.0x</option>
+                    <option value="5.0">5.0x</option>
+                    <option value="10.0">10.0x</option>
+                </select>
+            </div>
 
-        <button id="play-btn-{{ bag_index }}" onclick="togglePlayback({{ bag_index }})">
-            <span id="play-btn-text-{{ bag_index }}">Play Bag</span>
-        </button>
-        <button onclick="compressBag({{ bag_index }})" class="success">Compress</button>
+            <button class="play-btn-circle" id="play-btn-{{ bag_index }}" onclick="togglePlayback({{ bag_index }})">
+                <span id="play-icon-{{ bag_index }}">▶</span>
+            </button>
+
+            <button class="loop-btn" id="loop-btn-{{ bag_index }}" onclick="toggleLoop({{ bag_index }})" title="Loop playback">
+                <span id="loop-icon-{{ bag_index }}">🔁</span>
+            </button>
+        </div>
     </div>
+
+    <input type="checkbox" id="loop-{{ bag_index }}" name="loop" style="display: none;">
 
     <div id="terminal-section-{{ bag_index }}" style="display: none; margin-top: 1.5rem;">
         <div style="font-weight: 600; color: #555; margin-bottom: 0.5rem;">Terminal Output</div>
@@ -140,6 +155,190 @@
     .chip-remove:hover {
         background: #ffebee;
     }
+
+    /* Topic Grid with QoS */
+    .topic-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 0.5rem;
+    }
+
+    .topic-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border: 1px solid #e0e0e0;
+    }
+
+    .topic-name {
+        font-family: monospace;
+        font-size: 0.85rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+    }
+
+    .qos-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        padding: 0.25rem;
+        opacity: 0.6;
+        transition: all 0.2s;
+    }
+
+    .qos-btn:hover {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+
+    /* Music Player Styles */
+    .player-wrapper {
+        margin-top: 1.5rem;
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 1.5rem;
+    }
+
+    .player-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        color: #555;
+    }
+
+    .playback-time {
+        font-size: 0.9rem;
+        font-weight: 500;
+        font-family: monospace;
+    }
+
+    .compress-btn {
+        background: white;
+        border: 1px solid #e0e0e0;
+        color: #555;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+
+    .compress-btn:hover {
+        background: #f8f9fa;
+        border-color: #bbb;
+    }
+
+    .player-main {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2rem;
+    }
+
+    .play-btn-circle {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: white;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        line-height: 1;
+        color: #3498db;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transition: all 0.2s;
+    }
+
+    .play-btn-circle span {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .play-btn-circle:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+
+    .play-btn-circle:active {
+        transform: scale(1.05);
+    }
+
+    .play-btn-circle.playing {
+        background: #e74c3c;
+        color: white;
+    }
+
+    .loop-btn {
+        background: white;
+        border: 1px solid #e0e0e0;
+        color: #555;
+        cursor: pointer;
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        padding: 0.5rem;
+        border-radius: 4px;
+    }
+
+    .loop-btn:hover {
+        background: #f8f9fa;
+        border-color: #bbb;
+    }
+
+    .loop-btn.active {
+        background: #e3f2fd;
+        border-color: #2196f3;
+        color: #1976d2;
+    }
+
+    .speed-control {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .speed-control label {
+        font-size: 0.75rem;
+        color: #555;
+        font-weight: 500;
+    }
+
+    .speed-select {
+        background: white;
+        border: 1px solid #e0e0e0;
+        color: #555;
+        padding: 0.4rem 0.8rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .speed-select:hover {
+        background: #f8f9fa;
+        border-color: #bbb;
+    }
+
+    .speed-select option {
+        background: white;
+        color: #555;
+    }
 </style>
 
 <script>
@@ -154,22 +353,31 @@
 
     document.getElementById('bag-size-{{ bag_index }}').textContent = formatSize({{ bag.size }});
 
+    // Toggle loop button
+    window.toggleLoop = function(bagIndex) {
+        const checkbox = document.getElementById('loop-' + bagIndex);
+        const loopBtn = document.getElementById('loop-btn-' + bagIndex);
+
+        checkbox.checked = !checkbox.checked;
+        loopBtn.classList.toggle('active', checkbox.checked);
+    };
+
     // All playback monitoring is now handled in index_new.html
     // Check playback state on load to update UI if bag is already playing
     fetch('/playback-status')
         .then(response => response.json())
         .then(data => {
             const playBtn = document.getElementById('play-btn-{{ bag_index }}');
-            const playBtnText = document.getElementById('play-btn-text-{{ bag_index }}');
+            const playIcon = document.getElementById('play-icon-{{ bag_index }}');
             const terminalSection = document.getElementById('terminal-section-{{ bag_index }}');
 
             if (data.playing) {
-                if (playBtn) playBtn.style.background = '#e74c3c';
-                if (playBtnText) playBtnText.textContent = 'Stop Playback';
+                if (playBtn) playBtn.classList.add('playing');
+                if (playIcon) playIcon.textContent = '⏹';
                 if (terminalSection) terminalSection.style.display = 'block';
             }
         });
 
-    // All interactive functions (compressBag, showAddTagDialog, removeTag, togglePlayback)
+    // All interactive functions (compressBag, removeTag, togglePlayback, toggleLoop)
     // are now defined globally in index_new.html
 </script>

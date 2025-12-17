@@ -180,6 +180,8 @@ ros2 topic pub /test_topic std_msgs/msg/String "data: 'Hello ROS2'" -r 10
 - [ ] Enable compression and preview by default
 - [ ] Make it run in background (Docker or executable)
 - [ ] Deliverable as Docker container or standalone executable
+- [ ] Recording options similar to high speed camera
+- [ ] Preview of random samples of dataset
 
 ## Notes
 

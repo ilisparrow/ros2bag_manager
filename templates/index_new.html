@@ -947,7 +947,7 @@
             closeModal();
         }
 
-        function showConfirm(title, message, callback) {
+        function showConfirm(title, message, callback, confirmText = 'Delete', confirmColor = '#e74c3c') {
             const overlay = document.getElementById('modal-overlay');
             const icon = document.getElementById('modal-icon');
             const titleEl = document.getElementById('modal-title');
@@ -960,7 +960,7 @@
             body.innerHTML = message;
             footer.innerHTML = `
                 <button onclick="closeConfirm(false)" style="background: #95a5a6;">Cancel</button>
-                <button onclick="closeConfirm(true)" style="background: #e74c3c;">Delete</button>
+                <button onclick="closeConfirm(true)" style="background: ${confirmColor};">${confirmText}</button>
             `;
 
             overlay.classList.add('show');
@@ -1349,16 +1349,16 @@
 
         function updatePlaybackUI(bagIndex, isPlaying) {
             const playBtn = document.getElementById('play-btn-' + bagIndex);
-            const playBtnText = document.getElementById('play-btn-text-' + bagIndex);
+            const playIcon = document.getElementById('play-icon-' + bagIndex);
             const terminalSection = document.getElementById('terminal-section-' + bagIndex);
 
             if (isPlaying) {
-                if (playBtn) playBtn.style.background = '#e74c3c';
-                if (playBtnText) playBtnText.textContent = 'Stop Playback';
+                if (playBtn) playBtn.classList.add('playing');
+                if (playIcon) playIcon.textContent = '⏹';
                 if (terminalSection) terminalSection.style.display = 'block';
             } else {
-                if (playBtn) playBtn.style.background = '';
-                if (playBtnText) playBtnText.textContent = 'Play Bag';
+                if (playBtn) playBtn.classList.remove('playing');
+                if (playIcon) playIcon.textContent = '▶';
 
                 // Stop monitoring intervals
                 if (playbackCheckIntervals[bagIndex]) {
@@ -1472,6 +1472,121 @@
                     });
             })
             .catch(error => console.error('Error removing tag:', error));
+        };
+
+        // QoS Settings
+        let qosSettings = {}; // Store QoS settings per bag per topic
+
+        window.showQoSSettings = function(bagIndex, topic) {
+            // Load from memory or from bag metadata
+            let currentQoS = qosSettings[bagIndex]?.[topic];
+
+            // If not in memory, check the bag metadata
+            if (!currentQoS && allBags[bagIndex] && allBags[bagIndex].qos_settings) {
+                currentQoS = allBags[bagIndex].qos_settings[topic];
+                // Cache in memory
+                if (currentQoS) {
+                    if (!qosSettings[bagIndex]) qosSettings[bagIndex] = {};
+                    qosSettings[bagIndex][topic] = currentQoS;
+                }
+            }
+
+            // Default values if nothing saved
+            if (!currentQoS) {
+                currentQoS = {
+                    reliability: 'reliable',
+                    durability: 'volatile',
+                    history: 'keep_last',
+                    depth: 10
+                };
+            }
+
+            const content = `
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Reliability</label>
+                    <select id="qos-reliability" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="reliable" ${currentQoS.reliability === 'reliable' ? 'selected' : ''}>Reliable</option>
+                        <option value="best_effort" ${currentQoS.reliability === 'best_effort' ? 'selected' : ''}>Best Effort</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Durability</label>
+                    <select id="qos-durability" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="volatile" ${currentQoS.durability === 'volatile' ? 'selected' : ''}>Volatile</option>
+                        <option value="transient_local" ${currentQoS.durability === 'transient_local' ? 'selected' : ''}>Transient Local</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">History</label>
+                    <select id="qos-history" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="keep_last" ${currentQoS.history === 'keep_last' ? 'selected' : ''}>Keep Last</option>
+                        <option value="keep_all" ${currentQoS.history === 'keep_all' ? 'selected' : ''}>Keep All</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Depth (for Keep Last)</label>
+                    <input type="number" id="qos-depth" value="${currentQoS.depth}" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+            `;
+
+            const overlay = document.getElementById('modal-overlay');
+            const iconEl = document.getElementById('modal-icon');
+            const titleEl = document.getElementById('modal-title');
+            const bodyEl = document.getElementById('modal-body');
+            const footerEl = document.getElementById('modal-footer');
+
+            iconEl.className = 'modal-icon info';
+            iconEl.textContent = '⚙️';
+            titleEl.textContent = `QoS Settings: ${topic}`;
+            bodyEl.innerHTML = content;
+            footerEl.innerHTML = `
+                <button onclick="closeModal()" style="background: #95a5a6;">Cancel</button>
+                <button onclick="saveQoS(${bagIndex}, '${topic}')">Save</button>
+            `;
+
+            overlay.classList.add('show');
+        };
+
+        window.saveQoS = function(bagIndex, topic) {
+            const reliability = document.getElementById('qos-reliability').value;
+            const durability = document.getElementById('qos-durability').value;
+            const history = document.getElementById('qos-history').value;
+            const depth = parseInt(document.getElementById('qos-depth').value);
+
+            // Save to memory
+            if (!qosSettings[bagIndex]) {
+                qosSettings[bagIndex] = {};
+            }
+
+            qosSettings[bagIndex][topic] = {
+                reliability,
+                durability,
+                history,
+                depth
+            };
+
+            // Save to backend
+            const formData = new FormData();
+            formData.append('bag_index', bagIndex);
+            formData.append('topic', topic);
+            formData.append('reliability', reliability);
+            formData.append('durability', durability);
+            formData.append('history', history);
+            formData.append('depth', depth);
+
+            fetch('/save-qos', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                closeModal();
+                showAlert('QoS Saved', `QoS settings saved to metadata for ${topic}. These will be used during playback.`, 'success');
+            })
+            .catch(error => {
+                closeModal();
+                showAlert('Error', 'Failed to save QoS settings: ' + error, 'error');
+            });
         };
 
         // Initial load
