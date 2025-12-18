@@ -1401,6 +1401,16 @@
             }, 500);
         }
 
+        window.toggleLoop = function(bagIndex) {
+            const checkbox = document.getElementById('loop-' + bagIndex);
+            const loopBtn = document.getElementById('loop-btn-' + bagIndex);
+
+            if (checkbox && loopBtn) {
+                checkbox.checked = !checkbox.checked;
+                loopBtn.classList.toggle('active', checkbox.checked);
+            }
+        };
+
         window.compressBag = function(bagIndex) {
             const formData = new FormData();
             formData.append('bag_index', bagIndex);

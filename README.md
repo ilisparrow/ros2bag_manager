@@ -182,6 +182,8 @@ ros2 topic pub /test_topic std_msgs/msg/String "data: 'Hello ROS2'" -r 10
 - [ ] Deliverable as Docker container or standalone executable
 - [ ] Recording options similar to high speed camera
 - [ ] Preview of random samples of dataset
+- [ ] Add tags to the left list
+- [ ] Add replay count to the left list
 
 ## Notes
 

@@ -353,15 +353,6 @@
 
     document.getElementById('bag-size-{{ bag_index }}').textContent = formatSize({{ bag.size }});
 
-    // Toggle loop button
-    window.toggleLoop = function(bagIndex) {
-        const checkbox = document.getElementById('loop-' + bagIndex);
-        const loopBtn = document.getElementById('loop-btn-' + bagIndex);
-
-        checkbox.checked = !checkbox.checked;
-        loopBtn.classList.toggle('active', checkbox.checked);
-    };
-
     // All playback monitoring is now handled in index_new.html
     // Check playback state on load to update UI if bag is already playing
     fetch('/playback-status')
