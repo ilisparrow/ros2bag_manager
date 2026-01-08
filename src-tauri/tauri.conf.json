@@ -37,8 +37,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": [
-      "binaries/python-backend"
+    "resources": [
+      "../app.py",
+      "../templates/*",
+      "../pyproject.toml",
+      "../uv.lock"
     ]
   }
 }

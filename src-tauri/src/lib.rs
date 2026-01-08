@@ -2,13 +2,74 @@ use std::process::{Command, Child};
 use std::sync::Mutex;
 use std::time::Duration;
 use std::thread;
+use tauri::Manager;
 
 struct BackendProcess(Mutex<Option<Child>>);
 
-fn start_backend() -> Result<Child, Box<dyn std::error::Error>> {
+fn start_backend(app_handle: &tauri::AppHandle) -> Result<Child, Box<dyn std::error::Error>> {
+    // Try to get the resource directory
+    let resource_dir = app_handle.path().resource_dir()?;
+
+    // Try different possible locations for app.py
+    let possible_paths = vec![
+        resource_dir.join("app.py"),
+        resource_dir.join("_up_").join("app.py"),
+        std::env::current_dir()?.join("app.py"),
+    ];
+
+    println!("Resource dir: {:?}", resource_dir);
+
+    let mut app_path = None;
+    let mut work_dir = None;
+
+    for path in possible_paths {
+        println!("Trying: {:?}", path);
+        if path.exists() {
+            work_dir = path.parent().map(|p| p.to_path_buf());
+            app_path = Some(path);
+            break;
+        }
+    }
+
+    let app_path = app_path.ok_or("app.py not found in any expected location")?;
+    let work_dir = work_dir.ok_or("Failed to determine working directory")?;
+
+    println!("Starting Python backend from: {:?}", app_path);
+    println!("Working directory: {:?}", work_dir);
+
+    // Try to use 'uv run' if available (handles dependencies automatically)
+    // Otherwise fall back to system python3
+    let use_uv = std::process::Command::new("which")
+        .arg("uv")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    let mut cmd = if use_uv {
+        println!("Using 'uv run' to start backend");
+        // Create a writable venv location in tmp
+        let tmp_venv = std::env::temp_dir().join("rosbag_manager_venv");
+        println!("Using venv at: {:?}", tmp_venv);
+
+        let mut c = Command::new("uv");
+        c.arg("run");
+        c.arg("--python").arg("python3");
+        c.arg(&app_path);
+        c.env("UV_PROJECT_ENVIRONMENT", &tmp_venv);
+        c
+    } else {
+        println!("Using system python3");
+        let mut c = Command::new("python3");
+        c.arg(&app_path);
+        c
+    };
+
     // Start Python backend
-    let child = Command::new("python3")
-        .arg("app.py")
+    // Unset PYTHONHOME to use system Python instead of AppImage's broken paths
+    let child = cmd
+        .current_dir(&work_dir)
+        .env_remove("PYTHONHOME")
+        .env_remove("PYTHONPATH")
         .spawn()?;
 
     // Wait for backend to be ready
@@ -40,7 +101,7 @@ pub fn run() {
       }
 
       // Start Python backend process
-      let backend = start_backend()
+      let backend = start_backend(&app.handle())
           .expect("Failed to start Python backend");
 
       // Store backend process for cleanup
@@ -51,9 +112,9 @@ pub fn run() {
     .on_window_event(|window, event| {
       if let tauri::WindowEvent::Destroyed = event {
         // Kill backend when window closes
-        if let Some(backend_state) = window.state::<BackendProcess>().0.lock().ok() {
-          if let Some(mut backend) = backend_state.as_ref() {
-            let _ = backend.kill();
+        if let Ok(mut backend_state) = window.state::<BackendProcess>().0.lock() {
+          if let Some(ref mut backend) = *backend_state {
+            let _: Result<(), std::io::Error> = backend.kill();
           }
         }
       }
