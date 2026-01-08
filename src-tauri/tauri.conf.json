@@ -4,7 +4,6 @@
   "version": "0.1.0",
   "identifier": "com.rosbag.manager",
   "build": {
-    "frontendDist": "../templates",
     "devUrl": "http://localhost:8000",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""
@@ -41,7 +40,8 @@
       "../app.py",
       "../templates/*",
       "../pyproject.toml",
-      "../uv.lock"
+      "../uv.lock",
+      "../*.json"
     ]
   }
 }

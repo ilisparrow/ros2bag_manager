@@ -66,10 +66,11 @@ fn start_backend(app_handle: &tauri::AppHandle) -> Result<Child, Box<dyn std::er
 
     // Start Python backend
     // Unset PYTHONHOME to use system Python instead of AppImage's broken paths
+    // But preserve PATH and ROS environment variables for ros2 commands
     let child = cmd
         .current_dir(&work_dir)
         .env_remove("PYTHONHOME")
-        .env_remove("PYTHONPATH")
+        .env("PYTHONPATH", "")  // Clear but don't remove entirely
         .spawn()?;
 
     // Wait for backend to be ready
@@ -106,6 +107,11 @@ pub fn run() {
 
       // Store backend process for cleanup
       app.manage(BackendProcess(Mutex::new(Some(backend))));
+
+      // Get the main window and navigate to localhost
+      let window = app.get_webview_window("main").expect("Failed to get main window");
+      window.eval("window.location.href = 'http://localhost:8000'")
+          .expect("Failed to navigate to backend");
 
       Ok(())
     })
