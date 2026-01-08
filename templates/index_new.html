@@ -1274,7 +1274,8 @@
                         if (recordingCheckInterval) {
                             clearInterval(recordingCheckInterval);
                             recordingCheckInterval = null;
-                            loadBags();
+                            // Wait a bit for bag file to be fully written before refreshing
+                            setTimeout(() => loadBags(), 1000);
                         }
                     }
                 });
