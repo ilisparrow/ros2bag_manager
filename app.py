@@ -135,23 +135,45 @@ async def browse_folder():
     config = load_config()
     initial_dir = config.get('last_folder', str(Path.home()))
 
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes('-topmost', True)
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
 
-    folder = filedialog.askdirectory(
-        title="Select ROS2 Bags Folder",
-        initialdir=initial_dir
-    )
+        folder = filedialog.askdirectory(
+            title="Select ROS2 Bags Folder",
+            initialdir=initial_dir
+        )
 
-    root.destroy()
+        root.destroy()
 
-    if folder:
-        config['last_folder'] = folder
-        save_config(config)
-        return JSONResponse({"folder": folder})
-    else:
-        raise HTTPException(status_code=400, detail="No folder selected")
+        if folder:
+            config['last_folder'] = folder
+            save_config(config)
+            return JSONResponse({"folder": folder})
+        else:
+            raise HTTPException(status_code=400, detail="No folder selected")
+    except Exception as e:
+        # If tkinter fails (e.g., in AppImage), return error so UI can fallback to manual entry
+        raise HTTPException(status_code=500, detail=f"File dialog failed: {str(e)}")
+
+
+@app.post("/set-folder")
+async def set_folder(folder_path: str = Form(...)):
+    """Set folder path manually (fallback when file dialog doesn't work)"""
+    folder = Path(folder_path).expanduser()
+
+    if not folder.exists():
+        raise HTTPException(status_code=400, detail="Folder does not exist")
+
+    if not folder.is_dir():
+        raise HTTPException(status_code=400, detail="Path is not a directory")
+
+    config = load_config()
+    config['last_folder'] = str(folder)
+    save_config(config)
+
+    return JSONResponse({"folder": str(folder)})
 
 
 @app.get("/available-topics")

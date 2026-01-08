@@ -1151,7 +1151,20 @@
         function browseFolder() {
             fetch('/browse-folder')
                 .then(response => {
-                    if (!response.ok) throw new Error('No folder selected');
+                    if (!response.ok) {
+                        // File dialog failed, show manual input
+                        showPrompt(
+                            'Enter Folder Path',
+                            'File browser not available. Please enter the full path to your bags folder:',
+                            '',
+                            (path) => {
+                                if (path) {
+                                    setFolderManually(path);
+                                }
+                            }
+                        );
+                        throw new Error('File dialog failed');
+                    }
                     return response.json();
                 })
                 .then(data => {
@@ -1159,6 +1172,31 @@
                     loadBags();
                 })
                 .catch(error => console.log('Browse cancelled or error:', error));
+        }
+
+        function setFolderManually(path) {
+            const formData = new FormData();
+            formData.append('folder_path', path);
+
+            fetch('/set-folder', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.detail || 'Invalid folder');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById('folder-input').value = data.folder;
+                loadBags();
+            })
+            .catch(error => {
+                showAlert('Error', error.message, 'error');
+            });
         }
 
         function loadBags() {

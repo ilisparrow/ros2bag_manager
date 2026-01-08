@@ -46,10 +46,20 @@ fn start_backend(app_handle: &tauri::AppHandle) -> Result<Child, Box<dyn std::er
         .unwrap_or(false);
 
     let mut cmd = if use_uv {
-        println!("Using 'uv run' to start backend");
-        // Create a writable venv location in tmp
+        println!("Using 'uv run' to start backend with system packages");
+        // Create a writable venv location in tmp with access to system packages (for ROS2)
         let tmp_venv = std::env::temp_dir().join("rosbag_manager_venv");
         println!("Using venv at: {:?}", tmp_venv);
+
+        // Create venv with system-site-packages if it doesn't exist
+        if !tmp_venv.exists() {
+            println!("Creating venv with --system-site-packages");
+            let _ = std::process::Command::new("uv")
+                .arg("venv")
+                .arg("--system-site-packages")
+                .arg(&tmp_venv)
+                .output();
+        }
 
         let mut c = Command::new("uv");
         c.arg("run");
@@ -66,11 +76,21 @@ fn start_backend(app_handle: &tauri::AppHandle) -> Result<Child, Box<dyn std::er
 
     // Start Python backend
     // Unset PYTHONHOME to use system Python instead of AppImage's broken paths
-    // But preserve PATH and ROS environment variables for ros2 commands
+    // Preserve ROS2 environment by keeping system PYTHONPATH
+    let system_pythonpath = std::env::var("PYTHONPATH").unwrap_or_default();
+
+    // Filter out AppImage paths but keep ROS2 paths
+    let filtered_pythonpath: Vec<&str> = system_pythonpath
+        .split(':')
+        .filter(|p| !p.contains(".mount_") && (p.contains("ros") || p.contains("opt")))
+        .collect();
+
+    let ros_pythonpath = filtered_pythonpath.join(":");
+
     let child = cmd
         .current_dir(&work_dir)
         .env_remove("PYTHONHOME")
-        .env("PYTHONPATH", "")  // Clear but don't remove entirely
+        .env("PYTHONPATH", ros_pythonpath)
         .spawn()?;
 
     // Wait for backend to be ready
